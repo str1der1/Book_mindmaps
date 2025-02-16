@@ -11,7 +11,7 @@ import os
 import matplotlib.pyplot as plt
 
 # File paths for importing content
-book_title = "Attached: The New Science of Adult Attachment"
+book_title = "[Book] Attached: The New Science of Adult Attachment.  By Amir Levine and Rachel Heller"
 content_file_path = "Notes - Content.txt"
 notes_file_path = "Notes - Attached - 15Feb25.txt"
 
@@ -22,6 +22,33 @@ subdir = os.path.join(os.getcwd(), "attached_book")
 content_file_path = os.path.join(subdir, content_file_path)
 notes_file_path = os.path.join(subdir, notes_file_path)
 
+
+# ####################################
+
+
+def insert_line_breaks(text, max_length=30):
+    words = text.split()
+    lines = []
+    current_line = ""
+    for word in words:
+        if len(current_line) + len(word) + 1 > max_length:
+            lines.append(current_line)
+            current_line = word
+        else:
+            current_line += " " + word if current_line else word
+    
+    if current_line:
+        lines.append(current_line)
+
+    post_process_text = "\n".join(lines)
+
+    #DEBUG 
+    # print (f"# Pre format text : {text},     \n# Post process : {post_process_text}")
+
+    return post_process_text
+
+
+# ####################################
 
 def create_mindmap_attached():
     # Read chapter start pages from the content file, Define Chapters as a dictionary  (NOTE:  a List will be used with this dictionary to store the chapters and their respective page numbers)
@@ -219,13 +246,13 @@ def create_mindmap_attached():
 
 
     # Create a directed graph
-    G = nx.DiGraph()
+    graph = nx.DiGraph()
 
     # pos = nx.spiral_layout(G)
 
 
     # Add the root node (book title) at level 0
-    G.add_node(book_title, level=0, title=book_title)
+    graph.add_node(book_title, level=0, title=book_title)
 
     # Add nodes and edges
     for chapter, subchapters in mind_map_dict.items():
@@ -233,16 +260,16 @@ def create_mindmap_attached():
         subchapter_text = re.match(r"(\d+).", chapter, re.IGNORECASE)
         subchapter_text = subchapter_text.group(1) + " - Highlight" if subchapter_text else "Highlight"
 
-        G.add_node(chapter, level=1, title=chapter)  # Main chapter node
-        G.add_edge(book_title, chapter)  # Link chapters to book title
+        graph.add_node(chapter, level=1, title=insert_line_breaks(chapter))  # Main chapter node
+        graph.add_edge(book_title, chapter)  # Link chapters to book title
 
         for subchapter, notes in subchapters.items():
-            G.add_node(f"{subchapter_text}", level=2, title=subchapter)  # Subchapter node per chapter
-            G.add_edge(chapter, f"{subchapter_text}")  # Link chapter to its unique subchapter
+            graph.add_node(f"{subchapter_text}", level=2, title=insert_line_breaks(subchapter))  # Subchapter node per chapter
+            graph.add_edge(chapter, f"{subchapter_text}")  # Link chapter to its unique subchapter
 
             for note in notes[:5]:  # Limit to 5 notes per subchapter for clarity
-                G.add_node(f"{note}", level=3, title=note)  # Unique summary node per chapter
-                G.add_edge(f"{subchapter_text}", f"{note}")  # Link subchapter to its highlight
+                graph.add_node(f"{note}", level=3, title=insert_line_breaks(note))  # Unique summary node per chapter
+                graph.add_edge(f"{subchapter_text}", f"{note}")  # Link subchapter to its highlight
 
 
     #DEBUG: Print node and edge counts to verify graph content
@@ -252,19 +279,15 @@ def create_mindmap_attached():
     # print("Edges:", G.edges())
 
 
-    # Custom the labels:
-    nx.draw(G, with_labels=True, node_size=1500, font_size=25, font_color="yellow", font_weight="bold")
-    plt.show()
-
-    # Create an interactive Pyvis network
-    net = Network(notebook=True, height="750px", width="100%", directed=True, cdn_resources="remote")
+    # Create an INTERACTIVE Pyvis network
+    pyvis_net = Network(notebook=True, height="750px", width="100%", directed=True, cdn_resources="remote")
 
     # Enable physics for better layout
-    net.toggle_physics(True)
+    pyvis_net.toggle_physics(True)
     # net.show_buttons(filter_=['physics'])
 
     # Customize node size and text appearance
-    net.set_options('''
+    pyvis_net.set_options('''
     var options = {
         "nodes": {
             "shape": "box",
@@ -297,15 +320,17 @@ def create_mindmap_attached():
     }''')
 
 
-    # Add nodes with color based on level
-    for node, data in G.nodes(data=True):
+    # CONVERT Graph nodes to Pyvis interactive graph view nodes with color based on level
+    for node, data in graph.nodes(data=True):
+        #DEBUG 
+        print(f"# Conversion from Graph to Pyvis graph.  Node: {node}, Data: {data}")
         level = data.get("level", 3)
         color = "lightblue" if level == 1 else "lightgreen" if level == 2 else "lightgray"
-        net.add_node(node, label=node, title=data.get("title", node), color=color, physics=True)  # Ensure nodes are visible
+        pyvis_net.add_node(node, label=insert_line_breaks(node), title=insert_line_breaks(data.get("title", node)), color=color, physics=True)  # Ensure nodes are visible
 
-    # Add edges
-    for edge in G.edges():
-        net.add_edge(edge[0], edge[1])
+    # CONVERT GRAPH Edges to PYVIS edges
+    for edge in graph.edges():
+        pyvis_net.add_edge(edge[0], edge[1])
 
     # # TEST GRAPH (Manually adding nodes to verify rendering)
     # test_graph = Network(notebook=True, height="750px", width="100%", directed=True, cdn_resources="remote")
@@ -320,7 +345,7 @@ def create_mindmap_attached():
 
     # Save main graph
     with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp_file:
-        net.save_graph(tmp_file.name)
+        pyvis_net.save_graph(tmp_file.name)
         html_file = tmp_file.name
 
     # Streamlit app
@@ -331,6 +356,16 @@ def create_mindmap_attached():
     with open(html_file, "r", encoding="utf-8") as f:
         html_code = f.read()
     st.components.v1.html(html_code, height=750, scrolling=True)
+
+
+    # Also Plot the NetworkX graph using Matplotlib
+    st.divider()
+    st.title("Static Mind Map of 'Attached'")
+
+    plt.figure(figsize=(12, 8))
+    pos = nx.spring_layout(graph, seed=42)  # Define layout
+    nx.draw(graph, pos, with_labels=True, node_size=1500, font_size=8, font_color="green", edge_color="black")
+    st.pyplot(plt)
 
 
 # Create the mind map
