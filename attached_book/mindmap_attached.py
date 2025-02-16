@@ -323,7 +323,7 @@ def create_mindmap_attached():
     # CONVERT Graph nodes to Pyvis interactive graph view nodes with color based on level
     for node, data in graph.nodes(data=True):
         #DEBUG 
-        print(f"# Conversion from Graph to Pyvis graph.  Node: {node}, Data: {data}")
+        # print(f"# Conversion from Graph to Pyvis graph.  Node: {node}, Data: {data}")
         level = data.get("level", 3)
         color = "lightblue" if level == 1 else "lightgreen" if level == 2 else "lightgray"
         pyvis_net.add_node(node, label=insert_line_breaks(node), title=insert_line_breaks(data.get("title", node)), color=color, physics=True)  # Ensure nodes are visible
